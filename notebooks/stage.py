@@ -121,9 +121,8 @@ class Stage():
                     new_stage_datasets[key] = self.stage_datasets[key]
             self.__update_datasets__(new_stage_datasets)
         
-    def scrape_stage_data(self, print_row=False):
+    def scrape_stage_data(self, print_=False):
         html = self.stage_html
-        self.row_lengths
         # all the racers are in a table data cell ('td')
         # intialise variables
         td_cells = html.find_all('td')
@@ -133,212 +132,216 @@ class Stage():
         ds_names = list(self.stage_datasets.keys())
         data_id = 0
         ds_name = ds_names[data_id]
-        ds_columns_changed = False
-        row_length = self.row_lengths[data_id]
+        ds_columns = self.stage_datasets[ds_name]
+        ds = Category(data_id, ds_name, ds_columns)
 
-        old_length = row_length
-        last_list_length = 0
-        data_list = list()
-        error_list = list()
-        error_row = False
+        old_length = ds.row_length
 
-        row = [self.ID]
-        last_ix = 1
-        error_ix = 0
+        data_row = DataRow(self.ID)
+        if print_:
+            print('BEGINS COLS:', self.stage_datasets[ds_name])
+            print('TD: number of cells {}'.format(len(td_cells)))
 
         # itterate through all data cells and append their text values to a row
-        print('TD: number of cells {}'.format(len(td_cells)))
-        for td_ix, cell in enumerate(td_cells):
-            text = get_text(cell)
-            if type(text) is type('str'):
-                #print(row)
-                row.append(text)
-            else:
-                row.append(text[0])
-                row.append(text[1])
+        for cell in td_cells:
+            data_row = self._add_text_to_row(data_row, cell)
+            if print_ and ds.name == 'gc':
+                print(data_row.row)
 
-            if len(row) == 2:
+            column_name = ds.columns[data_row.length - 1]
+            if data_row.length == 2:
                 # the second element in the row is the position the rider finished
                 # if the rider did not finish, the position will not be an int
                 # it will be: DNF, DNS, OTL
-                not_int = is_not_int(row[1])
+                not_int = is_not_int(data_row.pos(1))
 
                 if not_int:
-                    error_row = True
+                    data_row.error_row = True
 
-                if not not_int and int(row[1]) == 1 and len(data_list) != 0:
-                    # a new table begins with a rider being placed 1st
-                    # save the complete previous table to the data map
-                    self.__add_data_list__(data_id, data_list)
-                    old_length = row_length
+                if not not_int and int(data_row.pos(1)) == 1 and len(ds.data_list) != 0:
+                    old_length = ds.row_length
+                    ds = self._end_ds(ds, ds_names)
+                    
+            ds, row, column_name = self._column_checks(ds, data_row, column_name, print_)
 
-                    #reinitialise variables
-                    data_id += 1
-                    ds_name = ds_names[data_id]
-                    points_columns_changed = False
-                    youth_columns_changed = False
-                    gc_pnt_removed = False
-                    gc_changes = False
-                    data_list = list()
-                    last_ix = 1
-                    error_row = False
-                
-                    row_length = self.row_lengths[data_id]
-                    print('OLD ROW: {}, NEW ROW: {}'.format(old_length, row_length))
-
-            #if ds_name == 'gc':
-            #   print(row)
-            
-            if self.stage_type in [ITT_CC, ONE_DAY_RACE] and len(row) in [3, 4]:
-                # some ITTs have no bib numbers for the riders
-                # we make it the postition number
-                row = self.__check_bib__(row, last_ix + error_ix)
-
-            if self.stage_type == OTHER_TOUR_STAGE:
-                if ds_name in ['points', 'kom'] and not points_columns_changed and len(row) in [4, 5]:
-                    # in the Other stages, kom or green points may be awarded only in later stages
-                    # for the first time. Until that point there wil be no changes in the points 
-                    # classifications. Bu default change columns are included in the dataset
-                    print('ROW LENGTH IS: {} and this is the row so far {}'.format(row_length, row))
-                    self.__check_change__(data_id, ds_name, row)
-                    points_columns_changed = True
-                
-                if ds_name == 'youth' and not youth_columns_changed and len(row) == 4:
-                    # for some reason some races don't have the youth change columns for their races
-                    text = row[3]
-
-                    if not is_change(text):
-                        # there are no change columns
-                        self.__remove_change_columns__(data_id, ds_name)
-                        youth_columns_changed = True
-                
-                if ds_name == 'gc':
-                    if not gc_pnt_removed and len(row) == 12:
-                        # repeated
-                        text = row[11]
-                        print('gc is col text change (should be true)', text, text == '..')
-                        if text == '..':
-                            self.__remove_change_columns__(data_id, ds_name)
-                            gc_pnt_removed = True
-
-                    if not gc_changes and len(row) in [4, 5]:
-                        text = row[3]
-                        print('gc is col text change (should be true)', text, not is_change(text), len(row))
-                        if not is_change(text):
-                            self.__remove_change_columns__(data_id, ds_name, 1)
-                            gc_changes = True
-
-                row_length = self.row_lengths[data_id]
-                #print('ROW LENGTH IS: aim for {}, current {}'.format(row_length, len(row)))
-                
-                
-            if ds_name == 'gc':
-                # there are uci gc points awarded to high category races/ stages
-                # not all stages have them. the position in the row varies for stage types
-                if self.stage_type in [PROLOGUE, FIRST_STAGE_IN_TOUR] and len(row) == 8:
-                    row = self.__check_uciGc__(row)
-                elif self.stage_type in [OTHER_TOUR_STAGE] and len(row) == 10:
-                    row = self.__check_uciGc__(row)
-            
-            if error_row and len(row) == old_length:
-                # a row with a DNS, DNF, OTL rider
-                # put the DNF reason in last position or the row list
-                # put the rider in the last position
-                row.append(row[1])
-                row[1] = last_ix
-                print('ERROR: {}'.format(row))
-                data_list.append(row)
-                row = [self.ID]
-                error_ix += 1
-
-            elif not error_row and len(row) == row_length:
-                # 'row_length' data cells make an entire row
-                if print_row:
-                    print(row)
-                # data list gets saved in data subset
-                pos = int(row[1])
-                # DQ/ DNF/ OL column
-                row.append(np.nan)
-                data_list.append(row)
-                last_ix = pos + 1
-                row = [self.ID]
+            if data_row.length == old_length and data_row.error_row:
+                ds = self._append_error_row(ds, data_row)
+                data_row = DataRow(self.ID)
+            elif data_row.length == ds.row_length and not data_row.error_row:
+                ds = self._append_row(ds, row)
+                data_row = DataRow(self.ID)
             
             #if len(row) > 20:
             #    break
+        self.__add_data_list__(ds)
 
-        self.__add_data_list__(data_id, data_list)
+    def _add_text_to_row(self, data_row, cell):
+        text = get_text(cell)
+        if type(text) is type('str'):
+            data_row.append(text)
+        else:
+            data_row.append(text[0])
+            data_row.append(text[1])
+        return data_row
+
+    def _end_ds(self, ds, ds_names):
+        # a new table begins with a rider being placed 1st
+        # save the complete previous table to the data map
+        data_id = ds.id + 1
+        self.__add_data_list__(ds)
+
+        #reinitialise variables
+        ds_name = ds_names[data_id]
+        ds_columns = self.stage_datasets[ds_name]
+        ds = Category(data_id, ds_name, ds_columns)
+        return ds
+
+    def _column_checks(self, ds, data_row, column_name, print_):
+        if self.stage_type in [ITT_CC, ONE_DAY_RACE] and data_row.length in [3, 4]:
+            # some ITTs have no bib numbers for the riders
+            # we make it the postition number
+            data_row = self.__check_bib__(data_row, ds.last_ix + ds.error_ix)
+
+        if self.stage_type == OTHER_TOUR_STAGE:
+            if ds.name in ['points', 'kom'] and not ds.points_columns_changed and data_row.length in [4, 5]:
+                # in the Other stages, kom or green points may be awarded only in later stages
+                # for the first time. Until that point there wil be no changes in the points 
+                    # for the first time. Until that point there wil be no changes in the points 
+                # for the first time. Until that point there wil be no changes in the points 
+                # classifications. Bu default change columns are included in the dataset
+                print('ROW LENGTH IS: {} and this is the row so far {}'.format(ds.row_length, data_row.row))
+                ds = self.__points_cat_change__(ds, text=data_row.pos(3))
+            
+            if ds.name == 'youth' and not ds.youth_columns_changed and column_name == 'youthChng':
+                # for some reason some races don't have the youth change columns for their races
+                ds = self.__youth_change__(ds, text=data_row.pos(-1))
+
+            if ds.name == 'teams' and not ds.team_changed and column_name == 'teamChng':
+                ds = self.__team_changes__(ds, text=data_row.pos(-1))
+            
+        if self.stage_type in [OTHER_TOUR_STAGE, ITT, FIRST_STAGE_IN_TOUR] and ds.name == 'gc':
+            # there are uci gc points awarded to high category races/ stages
+            # not all stages have them. the position in the row varies for stage types
+            if self.stage_type is not FIRST_STAGE_IN_TOUR and not ds.gc_changes and data_row.length in [4, 5]:
+                # gcChanges
+                ds = self.__gc_change__(ds, text=data_row.pos(3))
+                column_name = ds.columns[data_row.length - 1]    
+            
+            if print_:
+                print('UCISGC (should be true)', column_name, column_name == 'uciGc', )
+
+            if not ds.gc_uci_changed and column_name == 'uciGc':
+                # uciGc
+                ds = self.__check_uciGc__(ds, text=data_row.pos(-1))
+                column_name = ds.columns[data_row.length - 1]
+                
+            if print_:
+                print('All should be true', self.stage_type is not FIRST_STAGE_IN_TOUR, not ds.gc_pnt_removed, column_name == 'gcPnt', column_name)
+            if self.stage_type is not FIRST_STAGE_IN_TOUR and not ds.gc_pnt_removed and column_name == 'gcPnt':
+                # gc Points
+                ds = self.__gc_pnt__(ds, text=data_row.pos(-1))
+
+        column_name = ds.columns[data_row.length - 1]
+        return ds, data_row, column_name
         
-    def __check_bib__(self, row, row_id):
+    def __check_bib__(self, data_row, row_id):
         #print('Checking bib row:', row, row_id)
-        r3t = row[2]
-        #print('WHAT is this (Should D bib): ', r3t)
+        r3t = data_row.pos(2)
         not_int = is_not_int(r3t)
         if not_int:
-            rank = row[1]
+            rank = data_row.pos(1)
             if is_not_int(rank):
                 rank = 1000 + row_id
             url_or_space = r3t
-            before = row[:2]
-            #print('BEFORE:', before)
+            before = data_row.row[:2]
 
-            #print('URL OR SPACE (IF SPACE False) ', url_or_space != '')
             if url_or_space != '':
-                after = row[2:]
-        #        print('AFTER:', after)
-                row = before + [rank, True] + after
+                after = data_row.row[2:]
+                data_row.row = before + [rank, True] + after
             else:
-                row[2] = rank
-                row.append(True)
+                data_row.add_pos(2, rank)
+                data_row.append(True)
         else:
-            row.append(False)
-        #print('AFTER ROW', row)
-        return row
+            data_row.append(False)
+        return data_row
     
-    def __check_change__(self, ds_id, ds_name, row):
-        print('CHECKING CHANGE COLUMNS FOR {}'.format(ds_name))
-        text = row[3]
+    def __points_cat_change__(self, ds, text):
+        print('CHECKING CHANGE COLUMNS FOR {}'.format(ds.name))
         print('This is the text (should be true): {} {}'.format(text, is_rider_url(text)))
         if is_rider_url(text):
-            self.__remove_change_columns__(ds_id, ds_name)
-        return self.row_lengths[ds_id]
+            if ds.name == 'kom': ds.remove_columns(['prevKomPos', 'komChng'])
+            else: ds.remove_columns(['prevGreenPos', 'greenChng'])
+        ds.points_columns_changed = True
+        return ds
 
-    def __remove_change_columns__(self, _id, _name, gc_count=0):
-        old_columns = self.stage_datasets[_name]
-        if _name == 'kom':
-            old_columns.remove('prevKomPos')
-            old_columns.remove('komChng')
-        elif _name == 'points':
-            old_columns.remove('prevGreenPos')
-            old_columns.remove('greenChng')
-        elif _name == 'youth':
-            old_columns.remove('youthChng')
-            old_columns.remove('prevYouthPos')
-        elif _name == 'gc' and gc_count == 0:
-            old_columns.remove('gcPnt')
-        elif _name == 'gc' and gc_count == 1:
-            old_columns.remove('prevGcPos')
-            old_columns.remove('gcChng')
-        self.stage_datasets[_name] = old_columns
-        self.row_lengths[_id] = len(old_columns) - 1
+    def __youth_change__(self, ds, text):
+        if not is_change(text):
+            # there are no change columns
+            ds.remove_columns(['youthChng', 'prevYouthPos'])
+        ds.youth_columns_changed = True
+        return ds
 
-    def __check_uciGc__(self, row):
+    def __gc_change__(self, ds, text):
+        print('gc (looking for prevGcPos, gcChng) text change (should be false)', text, is_change(text))
+        if not is_change(text):
+            ds.remove_columns(['prevGcPos', 'gcChng'])
+        ds.gc_changes = True
+        return ds
+
+    def __gc_pnt__(self, ds, text):
+        print('gc (looking for gcPnt) text change (should be true) {} {}'.format(text, is_not_pnt(text)))
+        if is_not_pnt(text):
+            ds.remove_columns(['gcPnt'])
+        ds.gc_pnt_removed = True
+        return ds
+
+    def __team_changes__(self, ds, text):
+        if not is_change(text):
+            ds.remove_columns(['prevTeamPos', 'teamChng'])
+        ds.team_changed  = True
+        return ds
+
+    def _append_error_row(self, ds, data_row):
+        # a row with a DNS, DNF, OTL rider
+        # put the DNF reason in last position or the row list
+        # put the rider in the last position
+        data_row.append(data_row.pos(1))
+        data_row.add_pos(1, ds.last_ix)
+        if not data_row.pos(-1) in ['DNF', 'DNS', 'OTL', 'DSQ', '\xa0\xa0']:
+            print('ERROR: {}'.format(data_row.row))
+            print('COLS: {}'.format(self.stage_datasets[ds.name]))
+            raise ValueError
+        ds.error_ix = ds.error_ix + 1
+        ds.add_row(data_row.row)
+        return ds
+    
+    def _append_row(self, ds, data_row):
+        # 'row_length' data cells make an entire row
+        #if ds.name == 'gc':
+        #    print('Appending to datalist:', data_row.row)
+        # data list gets saved in data subset
+        pos = int(data_row.pos(1))
+        # DQ/ DNF/ OL column
+        data_row.append(np.nan)
+        ds.add_row(data_row.row)
+        ds.last_ix = pos + 1
+        return ds
+
+    def __check_uciGc__(self, ds, text):
         # there is no uciGC points
-        uciGc = row[-1]
-        if uciGc != '' and is_not_int(uciGc):
-            time = uciGc
-            row[-1] = ''
-            row.append(time)
-        return row
+        print('checking uciGC: ', text)
+        if text != '' and is_not_int(text):
+            ds.remove_columns(['uciGc'])
+        ds.gc_uci_changed = True
+        return ds
         
-    def __add_data_list__(self, key_id, data_list):
-        dataset_keys = list(self.stage_datasets.keys())
-        ds_key = dataset_keys[key_id]
-        print('UPDATING: {} has {} participants'.format(ds_key, len(data_list)))
-        if len(data_list) <= 1:
+    def __add_data_list__(self, ds):
+        print('\tUPDATING: {} has {} participants\n'.format(ds.name, len(ds.data_list)))
+        if len(ds.data_list) <= 1 and ds.name not in ["kom", "points"]:
             print('ERROR WITH NUMBER OF PARTICIPANTS')
             #print(self.stage_datasets[ds_key], data_list[0])
             raise ValueError
-        self.stage_data[ds_key] = data_list
+        self.stage_data[ds.name] = ds.data_list
 
     def build_df(self):
         if self.stage_data is None:
@@ -347,7 +350,6 @@ class Stage():
         dfs = list()
         dfs_to_decrease = self.column_subsets.keys()
         for dataset_name in self.stage_datasets.keys():
-            print('{} in {}'.format(dataset_name, self.stage_data.keys()))
             ds = self.stage_data[dataset_name]
             df_cols = self.stage_datasets[dataset_name]
             print('"{}" with columns: {}'.format(dataset_name, df_cols))
