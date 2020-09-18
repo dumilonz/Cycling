@@ -1,8 +1,11 @@
 import requests
-from stageConstants import *
 import pandas as pd
 import numpy as np
 from bs4 import BeautifulSoup
+from datetime import datetime
+
+from stageConstants import *
+from categories import Category, DataRow
 
 def fix_time(data, time_col):
     tdf = data[data[time_col] == ',,'][[time_col]]
@@ -42,6 +45,19 @@ def is_change(text):
     result = re.search(r'((▲\d)|(▼\d))', text)
     if result is None and text != '-': return False
     else: return True
+
+def is_not_pnt(text):
+    # it is a time or a '..' string
+    try:
+        text = text.replace(' ', '')
+        datetime.strptime(text, '%H:%M:%S')
+        return True
+    except:
+        # gc can have total hours greater than 24
+        # this throws an error for datetime
+        result = re.search(r'[\d]{1,}:[\d]{2}:[\d]{2}', text)
+        if result is not None or text == '..': return True
+        else: return False
 
 class Stage():
     def __init__(self, stage_ID, stage_url):
@@ -206,8 +222,6 @@ class Stage():
             if ds.name in ['points', 'kom'] and not ds.points_columns_changed and data_row.length in [4, 5]:
                 # in the Other stages, kom or green points may be awarded only in later stages
                 # for the first time. Until that point there wil be no changes in the points 
-                    # for the first time. Until that point there wil be no changes in the points 
-                # for the first time. Until that point there wil be no changes in the points 
                 # classifications. Bu default change columns are included in the dataset
                 print('ROW LENGTH IS: {} and this is the row so far {}'.format(ds.row_length, data_row.row))
                 ds = self.__points_cat_change__(ds, text=data_row.pos(3))
@@ -365,7 +379,14 @@ class Stage():
             # select necessary 
             if dataset_name in dfs_to_decrease:
                 if 'stage' in self.stage_datasets.keys() or dataset_name != 'gc':
-                    df = df[self.column_subsets[dataset_name]]
+                    df_cols = self.column_subsets[dataset_name]
+                    try:
+                        df = df[df_cols]
+                    except KeyError:
+                        for column in df_cols:
+                            if column not in df.columns:
+                                df[column] = ''
+                        df = df[df_cols]
                 
             if dataset_name != 'teams':
                 print("BIBS UNIQUE LENGTH: {} of full length {} and {}".format(len(df.index), df.shape[0], df.index))
