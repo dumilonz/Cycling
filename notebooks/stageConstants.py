@@ -14,12 +14,12 @@ def get_stage_columns(stage, all_df_cols=False):
     stage_columns[ONE_DAY_RACE] = {'stage': ['stageID', 'stagePos', 'bib', 'createBib', 'url', 'name', 'age', 'teamName', 'uciStage', 'pnt', 'stageTime', 'DNF']}
     stage_columns[ITT_CC] = {'stage': ['stageID', 'stagePos', 'bib', 'createBib', 'url', 'name', 'age', 'countryTeam', 'uciStage', 'pnt', 'stgAvgPace', 'stageTime', 'DNF']}
     stage_columns[ITT] = {'stage': ['stageID', 'stagePos', 'gc', 'gc-time', 'bib', 'url', 'name', 'age', 'team', 'uciStage', 'pnt', 'stgAvgPace', 'stageTime', 'DNF'], \
-                            'gc': ['stageID', 'gcPos', 'prevGcPos', 'gcChng', 'bib', 'url', 'name', 'age', 'team', 'uciGc', 'gcTime', 'more', 'DNF'], \
-                            'points': ['stageID', 'greenPos', 'prevGreenPos', 'greenChng', 'bib', 'url', 'name', 'age', 'team', 'greenPnts', 'greenPntsChng', 'DNF'], \
-                            'youth': ['stageID', 'youthPos', 'prevYouthPos', 'youthChng', 'gcPos', 'gcTime', 'bib', 'url', 'name', 'age', 'team', 'youthTime', 'DNF'], \
-                            'kom': ['stageID', 'komPos', 'prevKomPos', 'komChng', 'bib', 'url', 'name', 'age', 'team', 'komPnts',  'komPntsChng', 'DNF'], \
-                            'teams': ['stageID', 'teamPos', 'prevTeamPos', 'teamChng', 'empty', 'teamName', 'teamTime', 'DNF'] \
-                            }
+                                        'gc': ['stageID', 'gcPos', 'prevGcPos', 'gcChng', 'bib', 'url', 'name', 'age', 'team', 'uciGc', 'gcPnt', 'gcTime', 'more', 'DNF'], \
+                                        'points': ['stageID', 'greenPos', 'prevGreenPos', 'greenChng', 'bib', 'url', 'name', 'age', 'team', 'greenPnts', 'greenPntsChng', 'DNF'], \
+                                        'youth': ['stageID', 'youthPos', 'prevYouthPos', 'youthChng', 'gcPos', 'gcTime', 'bib', 'url', 'name', 'age', 'team', 'youthTime', 'DNF'], \
+                                        'kom': ['stageID', 'komPos', 'prevKomPos', 'komChng', 'bib', 'url', 'name', 'age', 'team', 'komPnts',  'komPntsChng', 'DNF'], \
+                                        'teams': ['stageID', 'teamPos', 'prevTeamPos', 'teamChng', 'empty', 'teamName', 'teamTime', 'DNF'] \
+                                        }
     stage_columns[FIRST_STAGE_IN_TOUR] = {'stage': ['stageID', 'stagePos', 'gcPos', 'timeAdd', 'bib', 'url', 'name', 'age', 'teamName', 'uciStage','pnt', 'stageTime', 'DNF'],
                                         'gc': ['stageID', 'gcPos', 'bib', 'url', 'name', 'age', 'team', 'uciGc', 'gcTime', 'more', 'DNF'], \
                                         'points': ['stageID', 'greenPos', 'bib', 'url', 'name', 'age', 'team', 'greenPnts', 'greenPntsChng', 'DNF'], \
@@ -28,7 +28,7 @@ def get_stage_columns(stage, all_df_cols=False):
                                         'teams': ['stageID', 'teamPos', 'empty', 'teamName', 'teamTime', 'DNF'] \
                                         }
     stage_columns[OTHER_TOUR_STAGE] = {'stage': ['stageID', 'stagePos', 'gcPos', 'gcTime', 'bib', 'url', 'name', 'age', 'teamName', 'uciStage','pnt', 'stageTime', 'DNF'], \
-                                        'gc': ['stageID', 'gcPos', 'prevGcPos', 'gcChng', 'bib', 'url', 'name', 'age', 'team', 'uciGc', 'gcTime', 'gcPnt', 'more', 'DNF'], \
+                                        'gc': ['stageID', 'gcPos', 'prevGcPos', 'gcChng', 'bib', 'url', 'name', 'age', 'team', 'uciGc', 'gcPnt', 'gcTime', 'more', 'DNF'], \
                                         'points': ['stageID', 'greenPos', 'prevGreenPos', 'greenChng', 'bib', 'url', 'name', 'age', 'team', 'greenPnts', 'greenPntsChng', 'DNF'], \
                                         'youth': ['stageID', 'youthPos', 'prevYouthPos', 'youthChng', 'gcPos', 'gcTime', 'bib', 'url', 'name', 'age', 'team', 'youthTime', 'DNF'], \
                                         'kom': ['stageID', 'komPos', 'prevKomPos', 'komChng', 'bib', 'url', 'name', 'age', 'team', 'komPnts',  'komPntsChng', 'DNF'], \
@@ -67,18 +67,13 @@ def get_all_df_columns():
     for el in al:
         cb = re.match('[\w]*Chng', el)
         lb = el in ['empty', 'more', 'bib']
-        if el == 'bib':
-            print('bib not being removed (should be true): {} {}'.format(el, lb))
         pb = re.match('prev[\w]*', el)
         if not(cb or lb or pb):
             al_sm.append(el)
-        else:
-            print(el)
     try:
         al.remove('prevGreenPos')
         al.remove('greenPntsChng')
     except:
         pass
     all_labels = sorted(al_sm)
-    print('ALL_LABELS: ', all_labels)
     return all_labels

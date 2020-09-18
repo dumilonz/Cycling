@@ -106,7 +106,6 @@ class Stage():
         div_res_left = self.stage_html.find_all('div', class_="res-left")
         li_list = div_res_left[0].find_all('li')
         html_datasets_list = [get_text(li)[1].lower() for li in li_list]
-        print('HTML datasets list: {}'.format(html_datasets_list))
         if len(html_datasets_list) > 0:
             new_stage_datasets = {}
             for key in html_datasets_list:
@@ -115,13 +114,11 @@ class Stage():
                 elif self.stage_type != TTT and key == '':
                     key = 'stage'
                 if key not in self.stage_datasets.keys() and key != '':
-                    print('KEY PROBLEM!!! Want ', key)
+                    print('KEY PROBLEM:  ', key)
                     raise ValueError
                 if key != '':
                     # time trial positions
                     new_stage_datasets[key] = self.stage_datasets[key]
-            print('Old stage datasets: ', self.stage_datasets.keys())
-            print('New stage datasets: ', new_stage_datasets.keys())
             self.__update_datasets__(new_stage_datasets)
         
     def scrape_stage_data(self, print_row=False):
@@ -132,7 +129,6 @@ class Stage():
         td_cells = html.find_all('td')
         # there can be up to 6 data tables on an html page
         self.stage_data = {}
-        print('DRL@@:', self.row_lengths)
         
         ds_names = list(self.stage_datasets.keys())
         data_id = 0
@@ -371,9 +367,7 @@ class Stage():
                 
             if dataset_name != 'teams':
                 print("BIBS UNIQUE LENGTH: {} of full length {} and {}".format(len(df.index), df.shape[0], df.index))
-                print('CHANGING index from {}'.format(df.index.name))
                 df = df.set_index('bib')
-                print('to {}'.format(df.index.name))
                 lid = list(df.index)
                 for l in lid:
                     if is_not_int(l):
@@ -386,12 +380,7 @@ class Stage():
             else:
                 self.team_df = df
 
-        for df in dfs:
-            print('INDEX: ', df.index.name, len(df.index.unique()) == df.shape[0])
         self.all_df = pd.concat(dfs, axis=1, sort=False)
-        print('ALL TOGETHER INDEX: {}'.format(self.all_df.index.name))
-        print('CHECK UNIQUE BIB values : {} == {}'.format(len(self.all_df.index.unique()), self.all_df.shape[0]))
-        print('BIB in columns:', 'bib' in self.all_df.columns)
         self.__create_all_columns__()
         return dfs
         
@@ -405,5 +394,4 @@ class Stage():
         self.all_df.index.name = 'bib'
         
     def get_all_df(self):
-        print('all df columns: {}\nand index: {}'.format(self.all_df.columns, self.all_df.index.name))
         return self.all_df
