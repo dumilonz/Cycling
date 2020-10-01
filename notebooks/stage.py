@@ -59,6 +59,13 @@ def is_not_pnt(text):
         if result is not None or text == '..': return True
         else: return False
 
+def not_empty_text(text):
+    t = text.replace(' ', '')
+    if len(t) == 0:
+        return False
+    else:
+        return True
+
 class Stage():
     def __init__(self, stage_ID, stage_url):
         self.ID = stage_ID
@@ -418,3 +425,64 @@ class Stage():
         
     def get_all_df(self):
         return self.all_df
+    
+    def find_stage_info(self):
+        '''
+            Each stage has more information about its profile. Itterate 
+            through each stage and extract the profile information. 
+        '''
+        res_ = self.stage_html.find_all("div", class_="res-right")
+        
+        res_text = res_[0].find_all(text=True)
+        
+        self.stage_info = list()
+        mountains = list()
+        found_race_rank = False
+        
+        for text in res_text:
+            web_regex = re.search('(www.(.)+\.(.)+)+', text) \
+                            or re.search('((.)+\.com(.)*)+', text) \
+                            or re.search('((.)+\.org(.)*)+', text) \
+                            or re.search('((.)+\.(\w)*(\d)*/)', text) \
+                            or 'googletag.cmd.push(' in text
+            repetitive_text = text in ['Race information', 'Date: ', 'Avg. speed winner:', 'rd', \
+                            'Race category: ', 'Parcours type:', 'PCS point scale:', \
+                            ' ', 'Start/finish:', ' › ', 'Climbs: ', ', ', 'Race profile', \
+                            'Finish photo', 'Finish photo', 'LiveStats', 'Websites:', \
+                            'Race ranking position', 'ranking', 'th', 'nd', 'st', '\n', \
+                            'breakdown', 'Position and points as on startdate of race.']
+            if not repetitive_text and not web_regex:
+                if len(self.stage_info) <= 6 or found_race_rank:
+                    # the first 6 cells of interest
+                    # or if the race rank has been found
+                    if '›' in text:
+                        start_ix = text.find('›')
+                        start = text[:start_ix]
+                        if not_empty_text(start):
+                            self.stage_info.append(start)
+                        text = text[start_ix + 1:]
+                    if not_empty_text(text):
+                        self.stage_info.append(text)
+                    if re.search('(\d)* pnt', text):
+                        # after this string regex there is only adds and redundant information
+                        break
+                else:
+                    # there is a variable number of mountains 
+                    if is_not_int(text):
+                        mountains.append(text)
+                    else:
+                        # race rank (int value) comes right after mountains 
+                        # have been listed
+                        self.stage_info.append(mountains)
+                        self.stage_info.append(len(mountains))
+                        self.stage_info.append(text)
+                        found_race_rank = True
+                        
+                        mountains = list()
+            
+            if text is 'ranking':
+                break
+
+        if len(mountains) != 0:
+            self.stage_info.append(mountains)
+            self.stage_info.append(len(mountains))
