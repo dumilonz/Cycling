@@ -8,9 +8,7 @@ from stageConstants import *
 from categories import Category, DataRow
 
 def fix_time(data, time_col):
-    tdf = data[data[time_col] == ',,'][[time_col]]
-    to_change_ix = list(tdf.index)
-    data.loc[data.index.isin(to_change_ix), time_col] = None
+    data.loc[(data[time_col] == ',,') | (data[time_col] == '-'), time_col] = None
     data[time_col] = data[time_col].fillna(method='ffill')
     return data
 
@@ -75,6 +73,7 @@ class Stage():
         self.stage_data = None
         self.team_df = None
         self.all_df = None
+        self.stage_info = None
         self.__init_datasets__()
         self.column_subsets = {
             'gc': ['bib', 'uciGc'],
@@ -253,6 +252,8 @@ class Stage():
 
             if not ds.gc_uci_changed and column_name == 'uciGc':
                 # uciGc
+                if print_:
+                    print('checking uciGC: ', data_row.pos(-1))
                 ds = self.__check_uciGc__(ds, text=data_row.pos(-1))
                 column_name = ds.columns[data_row.length - 1]
                 
@@ -287,7 +288,6 @@ class Stage():
         return data_row
     
     def __points_cat_change__(self, ds, text):
-        print('CHECKING CHANGE COLUMNS FOR {}'.format(ds.name))
         print('This is the text (should be true): {} {}'.format(text, is_rider_url(text)))
         if is_rider_url(text):
             if ds.name == 'kom': ds.remove_columns(['prevKomPos', 'komChng'])
@@ -350,21 +350,20 @@ class Stage():
 
     def __check_uciGc__(self, ds, text):
         # there is no uciGC points
-        print('checking uciGC: ', text)
         if text != '' and is_not_int(text):
             ds.remove_columns(['uciGc'])
         ds.gc_uci_changed = True
         return ds
         
     def __add_data_list__(self, ds):
-        print('\tUPDATING: {} has {} participants\n'.format(ds.name, len(ds.data_list)))
+        print('\tUPDATING: {} has {} participants'.format(ds.name, len(ds.data_list)))
         if len(ds.data_list) <= 1 and ds.name not in ["kom", "points"]:
             print('ERROR WITH NUMBER OF PARTICIPANTS')
             #print(self.stage_datasets[ds_key], data_list[0])
             raise ValueError
         self.stage_data[ds.name] = ds.data_list
 
-    def build_df(self):
+    def build_df(self, print_=False):
         if self.stage_data is None:
             self.scrape_stage_data()
 
@@ -373,13 +372,16 @@ class Stage():
         for dataset_name in self.stage_datasets.keys():
             ds = self.stage_data[dataset_name]
             df_cols = self.stage_datasets[dataset_name]
-            print('"{}" with columns: {}'.format(dataset_name, df_cols))
-            print(ds[0])
+            if print_:
+                print('"{}" with columns: {}'.format(dataset_name, df_cols))
+                print(ds[0])
             df = pd.DataFrame(ds, columns=df_cols)
             
             # fix times
             if dataset_name == 'stage':
                 df = fix_time(df, 'stageTime')
+                if 'gcTotalTime' in df.columns:
+                    df = fix_time(df, 'gcTotalTime')
             if dataset_name == 'youth':
                 df = fix_time(df, 'youthTime')
             
@@ -396,7 +398,8 @@ class Stage():
                         df = df[df_cols]
                 
             if dataset_name != 'teams':
-                print("BIBS UNIQUE LENGTH: {} of full length {} and {}".format(len(df.index), df.shape[0], df.index))
+                if print_:
+                    print("BIBS UNIQUE LENGTH: {} of full length {} and {}".format(len(df.index), df.shape[0], df.index))
                 df = df.set_index('bib')
                 lid = list(df.index)
                 for l in lid:
